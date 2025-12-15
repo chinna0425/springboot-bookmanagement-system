@@ -1,12 +1,12 @@
 package com.example.BookManagementSystem.repository;
 
 import com.example.BookManagementSystem.dto.UserResponseDto;
-import com.example.BookManagementSystem.dto.UserSignupRequestDto;
+import com.example.BookManagementSystem.dto.UserCreateRequestDto;
 
 import java.util.List;
 
 public interface UserRepository {
-    UserResponseDto registerUser(UserSignupRequestDto dto);
+    UserResponseDto registerUser(UserCreateRequestDto dto);
 
     UserResponseDto loginUser(String emailOrUsername, String rawPassword);
 
@@ -14,7 +14,7 @@ public interface UserRepository {
 
     UserResponseDto getUserById(Long id);
 
-    UserResponseDto updateUser(Long id,UserSignupRequestDto dto);
+    UserResponseDto updateUser(Long id, UserCreateRequestDto dto);
 
     void deleteUser(Long id);
 }

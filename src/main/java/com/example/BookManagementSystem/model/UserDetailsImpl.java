@@ -18,7 +18,7 @@ public class UserDetailsImpl implements UserDetails {
     // No roles required per the instruction: return empty authorities or one default if needed.
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singleton(new SimpleGrantedAuthority("USER"));
+        return Collections.singleton(new SimpleGrantedAuthority(user.getRole().name()));
     }
 
     @Override

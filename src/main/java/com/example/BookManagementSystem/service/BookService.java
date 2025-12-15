@@ -1,33 +1,23 @@
 package com.example.BookManagementSystem.service;
 
-import com.example.BookManagementSystem.dto.AuthorResponseDto;
-import com.example.BookManagementSystem.dto.BookRequestDto;
-import com.example.BookManagementSystem.dto.BookResponseDto;
-import com.example.BookManagementSystem.dto.PublisherResponseDto;
+import com.example.BookManagementSystem.dto.*;
+import com.example.BookManagementSystem.exception.BadRequestException;
+import com.example.BookManagementSystem.exception.ResourceNotFoundException;
 import com.example.BookManagementSystem.model.Author;
 import com.example.BookManagementSystem.model.Book;
 import com.example.BookManagementSystem.model.Publisher;
 import com.example.BookManagementSystem.repository.AuthorJpaRepository;
 import com.example.BookManagementSystem.repository.BookJpaRepository;
 import com.example.BookManagementSystem.repository.PublisherJpaRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @Transactional
 public class BookService {
-
-    private static final Logger log = LoggerFactory.getLogger(BookService.class);
 
     @Autowired
     private BookJpaRepository bookJpaRepository;
@@ -42,214 +32,138 @@ public class BookService {
         List<Book> books = bookJpaRepository.findAll();
         List<BookResponseDto> result = new ArrayList<>();
         for (Book b : books) {
-            if (b == null) continue;
-            BookResponseDto dto = mapBookToDto(b);
-            result.add(dto);
+            result.add(mapBookToDto(b));
         }
         return result;
     }
 
     public BookResponseDto getBookById(int bookId) {
         Book book = bookJpaRepository.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Book not found with id " + bookId));
         return mapBookToDto(book);
     }
 
-    public BookResponseDto addBook(BookRequestDto req) {
-        if (req == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Book required");
+    public BookResponseDto addBook(BookCreateRequestDto req) {
+        Publisher publisher = publisherJpaRepository.findById(req.getPublisherId())
+                .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
+
+        List<Author> authors = fetchAuthorsByIdsOrThrow(req.getAuthorIds());
+
+        Book book = new Book();
+        book.setName(req.getName());
+        book.setImageUrl(req.getImageUrl());
+        book.setPublisher(publisher);
+        book.setAuthorsList(authors);
+
+        Book saved = bookJpaRepository.save(book);
+
+        // minimal bidirectional sync
+        for (Author a : authors) {
+            a.getBooksList().add(saved);
         }
+        authorJpaRepository.saveAll(authors);
 
-        // validate publisher if provided
-        Publisher publisher = null;
-        if (req.getPublisherId() != null) {
-            publisher = publisherJpaRepository.findById(req.getPublisherId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Wrong publisherId"));
-        }
-
-        // validate authors if provided
-        List<Integer> authorIds = req.getAuthorIds();
-        List<Author> authors = new ArrayList<>();
-        if (authorIds != null && !authorIds.isEmpty()) {
-            authors = fetchAuthorsByIdsOrThrow(authorIds);
-        }
-
-        // create book entity
-        Book toSave = new Book();
-        toSave.setName(req.getName());
-        toSave.setImageUrl(req.getImageUrl());
-        toSave.setPublisher(publisher);
-        toSave.setAuthorsList(authors);
-
-        // save book (owning side)
-        Book saved = bookJpaRepository.save(toSave);
-
-        // ensure bidirectional relation: add saved book to each author's booksList
-        if (saved.getAuthorsList() != null && !saved.getAuthorsList().isEmpty()) {
-            for (Author a : saved.getAuthorsList()) {
-                if (a.getBooksList() == null) a.setBooksList(new ArrayList<>());
-                boolean exists = false;
-                for (Book bb : a.getBooksList()) {
-                    if (bb != null && bb.getId() != null && bb.getId().equals(saved.getId())) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (!exists) {
-                    a.getBooksList().add(saved);
-                }
-            }
-            authorJpaRepository.saveAll(saved.getAuthorsList());
-        }
-
-        BookResponseDto resp = mapBookToDto(saved);
-        return resp;
+        return mapBookToDto(saved);
     }
 
-    public BookResponseDto updateBook(int bookId, BookRequestDto req) {
-        Book existing = bookJpaRepository.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
+    public BookResponseDto updateBook(int bookId, BookUpdateRequestDto req) {
 
-        if (req == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Book payload required");
+        if (req.isEmpty()) {
+            throw new IllegalArgumentException("At least one field must be provided for update");
+        }
+        Book book = bookJpaRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+
+        if (req.getName() != null) {
+            book.setName(req.getName());
         }
 
-        if (req.getName() != null) existing.setName(req.getName());
-        if (req.getImageUrl() != null) existing.setImageUrl(req.getImageUrl());
+        if (req.getImageUrl() != null) {
+            book.setImageUrl(req.getImageUrl());
+        }
 
-        // handle publisher change
         if (req.getPublisherId() != null) {
-            Publisher p = publisherJpaRepository.findById(req.getPublisherId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publisher not found"));
-            existing.setPublisher(p);
+            Publisher publisher = publisherJpaRepository.findById(req.getPublisherId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
+            book.setPublisher(publisher);
         }
 
-        // handle authors replacement if provided
         if (req.getAuthorIds() != null) {
-            // detach from old authors
-            List<Author> oldAuthors = existing.getAuthorsList();
-            if (oldAuthors == null) oldAuthors = new ArrayList<>();
-            if (!oldAuthors.isEmpty()) {
-                for (Author a : oldAuthors) {
-                    if (a != null && a.getBooksList() != null) {
-                        for (int i = a.getBooksList().size() - 1; i >= 0; i--) {
-                            Book bb = a.getBooksList().get(i);
-                            if (bb != null && bb.getId() != null && bb.getId().equals(existing.getId())) {
-                                a.getBooksList().remove(i);
-                            }
-                        }
-                    }
-                }
-                authorJpaRepository.saveAll(oldAuthors);
-            }
 
-            // fetch new authors
-            List<Integer> newAuthorIds = req.getAuthorIds();
-            List<Author> newAuthors = new ArrayList<>();
-            if (newAuthorIds != null && !newAuthorIds.isEmpty()) {
-                newAuthors = fetchAuthorsByIdsOrThrow(newAuthorIds);
+            // Removing old mappings
+            for (Author a : book.getAuthorsList()) {
+                a.getBooksList().remove(book);
             }
+            authorJpaRepository.saveAll(book.getAuthorsList());
 
-            // attach existing book to each new author
+            // ADDing new mappings
+            List<Author> newAuthors = fetchAuthorsByIdsOrThrow(req.getAuthorIds());
             for (Author a : newAuthors) {
-                if (a.getBooksList() == null) a.setBooksList(new ArrayList<>());
-                boolean exists = false;
-                for (Book bb : a.getBooksList()) {
-                    if (bb != null && bb.getId() != null && bb.getId().equals(existing.getId())) {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (!exists) {
-                    a.getBooksList().add(existing);
-                }
+                a.getBooksList().add(book);
             }
-            if (!newAuthors.isEmpty()) {
-                authorJpaRepository.saveAll(newAuthors);
-            }
-            existing.setAuthorsList(newAuthors);
+            authorJpaRepository.saveAll(newAuthors);
+
+            book.setAuthorsList(newAuthors);
         }
 
-        existing = bookJpaRepository.save(existing);
-        return mapBookToDto(existing);
+        return mapBookToDto(bookJpaRepository.save(book));
     }
+
 
     public void deleteBook(int bookId) {
         Book book = bookJpaRepository.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
 
-        List<Author> authors = book.getAuthorsList();
-        if (authors != null && !authors.isEmpty()) {
-            for (Author a : authors) {
-                if (a != null && a.getBooksList() != null) {
-                    for (int i = a.getBooksList().size() - 1; i >= 0; i--) {
-                        Book bb = a.getBooksList().get(i);
-                        if (bb != null && bb.getId() != null && bb.getId().equals(book.getId())) {
-                            a.getBooksList().remove(i);
-                        }
-                    }
-                }
-            }
-            authorJpaRepository.saveAll(authors);
+        for (Author a : book.getAuthorsList()) {
+            a.getBooksList().remove(book);
         }
+        authorJpaRepository.saveAll(book.getAuthorsList());
 
-        bookJpaRepository.deleteById(bookId);
+        bookJpaRepository.delete(book);
     }
 
     public PublisherResponseDto getBookPublisher(int bookId) {
-        Book existing = bookJpaRepository.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
-        Publisher p = existing.getPublisher();
-        if (p == null) return null;
-        PublisherResponseDto dto = new PublisherResponseDto();
-        dto.setPublisherId(p.getPublisherId());
-        dto.setPublisherName(p.getPublisherName());
-        return dto;
+        Book book = bookJpaRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+
+        Publisher p = book.getPublisher();
+        if (p == null) {
+            throw new ResourceNotFoundException("Publisher not assigned");
+        }
+
+        return new PublisherResponseDto(
+                p.getPublisherId(),
+                p.getPublisherName()
+        );
     }
 
     public List<AuthorResponseDto> getBookAuthors(int bookId) {
-        Book existing = bookJpaRepository.findById(bookId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
-        List<Author> authors = existing.getAuthorsList();
+        Book book = bookJpaRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Book not found"));
+
         List<AuthorResponseDto> result = new ArrayList<>();
-        if (authors == null) return result;
-        for (Author a : authors) {
-            if (a == null) continue;
-            AuthorResponseDto dto = new AuthorResponseDto();
-            dto.setAuthorId(a.getAuthorId());
-            dto.setAuthorName(a.getAuthorName());
-            result.add(dto);
+        for (Author a : book.getAuthorsList()) {
+            result.add(new AuthorResponseDto(
+                    a.getAuthorId(),
+                    a.getAuthorName()
+            ));
         }
         return result;
     }
 
-    /* ----------------- helpers (no streams) ----------------- */
+    // helper functions
 
     private List<Author> fetchAuthorsByIdsOrThrow(List<Integer> ids) {
-        List<Author> found = authorJpaRepository.findAllById(ids);
-
-        // build unique requested ids
-        Set<Integer> uniqueRequested = new HashSet<>();
-        for (Integer id : ids) {
-            if (id != null) uniqueRequested.add(id);
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        // build found ids set
-        Set<Integer> foundIds = new HashSet<>();
-        for (Author a : found) {
-            if (a != null && a.getAuthorId() != null) foundIds.add(a.getAuthorId());
+        List<Author> authors = authorJpaRepository.findAllById(ids);
+        if (authors.size() != ids.size()) {
+            throw new BadRequestException("One or more authors not found");
         }
-
-        // compute missing
-        List<Integer> missing = new ArrayList<>();
-        for (Integer id : uniqueRequested) {
-            if (!foundIds.contains(id)) missing.add(id);
-        }
-
-        if (!missing.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Some authors not found: " + missing);
-        }
-        return found;
+        return authors;
     }
 
     private BookResponseDto mapBookToDto(Book b) {
@@ -258,28 +172,21 @@ public class BookService {
         dto.setName(b.getName());
         dto.setImageUrl(b.getImageUrl());
 
-        Publisher p = b.getPublisher();
-        if (p != null) {
-            PublisherResponseDto pdto = new PublisherResponseDto();
-            pdto.setPublisherId(p.getPublisherId());
-            pdto.setPublisherName(p.getPublisherName());
-            dto.setPublisher(pdto);
-        } else {
-            dto.setPublisher(null);
+        if (b.getPublisher() != null) {
+            dto.setPublisher(new PublisherResponseDto(
+                    b.getPublisher().getPublisherId(),
+                    b.getPublisher().getPublisherName()
+            ));
         }
 
-        List<Author> authors = b.getAuthorsList();
-        List<AuthorResponseDto> authorDtos = new ArrayList<>();
-        if (authors != null) {
-            for (Author a : authors) {
-                if (a == null) continue;
-                AuthorResponseDto adto = new AuthorResponseDto();
-                adto.setAuthorId(a.getAuthorId());
-                adto.setAuthorName(a.getAuthorName());
-                authorDtos.add(adto);
-            }
+        List<AuthorResponseDto> authors = new ArrayList<>();
+        for (Author a : b.getAuthorsList()) {
+            authors.add(new AuthorResponseDto(
+                    a.getAuthorId(),
+                    a.getAuthorName()
+            ));
         }
-        dto.setAuthors(authorDtos);
+        dto.setAuthors(authors);
 
         return dto;
     }

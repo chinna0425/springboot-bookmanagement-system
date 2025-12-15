@@ -15,29 +15,35 @@ public class Users {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id",nullable = false,unique = true)
     private Long id;
 
-    @Column(name = "username", nullable = false,unique = true,length = 100)
+    @Column(nullable = false, unique = true)
     private String userName;
 
-    @Column(name = "email", nullable = false,unique = true,length = 100)
+    @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "passwordhash")
+    @Column(nullable = false)
     private String passwordHash;
 
-    @Column(name="createdat")
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /*
+    // automatic timestamp
     @PrePersist
-    protected void onCreatedAt(){
-        this.createdAt=LocalDateTime.now();
-    }
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    } */
 
     public Users(String userName, String email, String passwordHash) {
         this.userName = userName;
         this.email = email;
         this.passwordHash = passwordHash;
+        this.role = Role.ROLE_USER; // default role
     }
 }

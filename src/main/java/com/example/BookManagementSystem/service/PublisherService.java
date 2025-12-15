@@ -1,18 +1,16 @@
 package com.example.BookManagementSystem.service;
 
-import com.example.BookManagementSystem.dto.PublisherRequestDto;
+import com.example.BookManagementSystem.dto.PublisherCreateRequestDto;
 import com.example.BookManagementSystem.dto.PublisherResponseDto;
+import com.example.BookManagementSystem.dto.PublisherUpdateRequestDto;
+import com.example.BookManagementSystem.exception.ResourceNotFoundException;
 import com.example.BookManagementSystem.model.Book;
 import com.example.BookManagementSystem.model.Publisher;
 import com.example.BookManagementSystem.repository.BookJpaRepository;
 import com.example.BookManagementSystem.repository.PublisherJpaRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,8 +18,6 @@ import java.util.List;
 @Service
 @Transactional
 public class PublisherService {
-
-    private static final Logger log = LoggerFactory.getLogger(PublisherService.class);
 
     @Autowired
     private PublisherJpaRepository publisherJpaRepository;
@@ -32,82 +28,66 @@ public class PublisherService {
     public List<PublisherResponseDto> getPublishers() {
         List<Publisher> publishers = publisherJpaRepository.findAll();
         List<PublisherResponseDto> result = new ArrayList<>();
+
         for (Publisher p : publishers) {
-            if (p == null) continue;
-            PublisherResponseDto dto = new PublisherResponseDto();
-            dto.setPublisherId(p.getPublisherId());
-            dto.setPublisherName(p.getPublisherName());
-            result.add(dto);
+            result.add(mapToDto(p));
         }
         return result;
     }
 
     public PublisherResponseDto getPublisherById(int publisherId) {
         Publisher p = publisherJpaRepository.findById(publisherId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publisher not found"));
-        PublisherResponseDto dto = new PublisherResponseDto();
-        dto.setPublisherId(p.getPublisherId());
-        dto.setPublisherName(p.getPublisherName());
-        return dto;
+                .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
+        return mapToDto(p);
     }
 
-    public PublisherResponseDto addPublisher(PublisherRequestDto req) {
-        if (req == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Publisher required");
-        }
-
-        String name = req.getPublisherName();
-        if (name == null || name.trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PublisherName required");
-        }
+    public PublisherResponseDto addPublisher(PublisherCreateRequestDto req) {
 
         Publisher p = new Publisher();
-        p.setPublisherName(name.trim());
+        p.setPublisherName(req.getPublisherName().trim());
 
-        Publisher saved = publisherJpaRepository.save(p);
-
-        PublisherResponseDto dto = new PublisherResponseDto();
-        dto.setPublisherId(saved.getPublisherId());
-        dto.setPublisherName(saved.getPublisherName());
-        return dto;
+        return mapToDto(publisherJpaRepository.save(p));
     }
 
-    public PublisherResponseDto updatePublisher(int publisherId, PublisherRequestDto req) {
-        Publisher existing = publisherJpaRepository.findById(publisherId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publisher not found"));
+    public PublisherResponseDto updatePublisher(int publisherId, PublisherUpdateRequestDto req) {
 
-        if (req == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Publisher payload required");
+        if (req.isEmpty()) {
+            throw new IllegalArgumentException("At least one field must be provided for update");
         }
+        Publisher existing = publisherJpaRepository.findById(publisherId)
+                .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
 
         if (req.getPublisherName() != null) {
-            existing.setPublisherName(req.getPublisherName());
+            existing.setPublisherName(req.getPublisherName().trim());
         }
 
-        existing = publisherJpaRepository.save(existing);
-
-        PublisherResponseDto dto = new PublisherResponseDto();
-        dto.setPublisherId(existing.getPublisherId());
-        dto.setPublisherName(existing.getPublisherName());
-        return dto;
+        return mapToDto(publisherJpaRepository.save(existing));
     }
 
     public void deletePublisher(int publisherId) {
+
         Publisher existing = publisherJpaRepository.findById(publisherId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publisher not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
 
         List<Book> books = bookJpaRepository.findByPublisher(existing);
-        if (books == null) books = new ArrayList<>();
 
         for (Book b : books) {
-            if (b != null) {
-                b.setPublisher(null);
-            }
+            b.setPublisher(null); // detach relationship
         }
 
         if (!books.isEmpty()) {
             bookJpaRepository.saveAll(books);
         }
+
         publisherJpaRepository.delete(existing);
+    }
+
+    // helper functions
+
+    private PublisherResponseDto mapToDto(Publisher p) {
+        return new PublisherResponseDto(
+                p.getPublisherId(),
+                p.getPublisherName()
+        );
     }
 }

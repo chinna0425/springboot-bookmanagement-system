@@ -2,15 +2,18 @@ package com.example.BookManagementSystem.controller;
 
 import com.example.BookManagementSystem.dto.UserLoginRequestDto;
 import com.example.BookManagementSystem.dto.UserResponseDto;
-import com.example.BookManagementSystem.dto.UserSignupRequestDto;
+import com.example.BookManagementSystem.dto.UserCreateRequestDto;
+import com.example.BookManagementSystem.dto.UserUpdateRequestDto;
+import com.example.BookManagementSystem.model.UserDetailsImpl;
+import com.example.BookManagementSystem.model.Users;
 import com.example.BookManagementSystem.service.UsersService;
 import com.example.BookManagementSystem.service.JwtService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
 import java.util.List;
 import java.util.Map;
 
@@ -24,60 +27,61 @@ public class UsersController {
     @Autowired
     private JwtService jwtService;
 
-    // signup
+    // create user
     @PostMapping("/user/signup")
-    public ResponseEntity<?> signup(@RequestBody UserSignupRequestDto dto) {
-        try {
-            UserResponseDto resp = usersService.registerUser(dto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(resp);
-        } catch (ResponseStatusException ex) {
-            return ResponseEntity.status(ex.getStatusCode()).body(Map.of("error", ex.getReason()));
-        }
+    public ResponseEntity<UserResponseDto> signup(
+            @Valid @RequestBody UserCreateRequestDto dto) {
+
+        UserResponseDto resp = usersService.registerUser(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
-    // login -> returns token and user
+    // login
     @PostMapping("/user/login")
-    public ResponseEntity<?> login(@RequestBody UserLoginRequestDto dto) {
-        try {
-            UserResponseDto resp = usersService.loginUser(dto.getUsernameOrEmail(), dto.getPassword());
-            String token = jwtService.generateJwtToken(dto.getUsernameOrEmail().trim());
-            return ResponseEntity.ok(Map.of("token", token, "user", resp));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
-        } catch (ResponseStatusException ex) {
-            return ResponseEntity.status(ex.getStatusCode()).body(Map.of("error", ex.getReason()));
-        }
+    public ResponseEntity<Map<String, String>> login(
+            @Valid @RequestBody UserLoginRequestDto dto) {
+
+        Users user = usersService.loginUser(
+                dto.getUsernameOrEmail(),
+                dto.getPassword()
+        );
+
+        String token = jwtService.generateJwtToken(
+                new UserDetailsImpl(user)
+        );
+
+        return ResponseEntity.ok(Map.of("token", token));
     }
 
-    // list all users
+    // get all users
     @GetMapping("/users")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<List<UserResponseDto>> getAll() {
-        List<UserResponseDto> list = usersService.getAllUsers();
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(usersService.getAllUsers());
     }
 
-    // get by id
+    // get user by id
     @GetMapping("/user/{id}")
-    public ResponseEntity<UserResponseDto> getById(@PathVariable("id") Long id) {
-        UserResponseDto dto = usersService.getUserById(id);
-        if (dto == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        return ResponseEntity.ok(dto);
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<UserResponseDto> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(usersService.getUserById(id));
     }
 
-    // update
+    // update user by id
     @PutMapping("/user/{id}")
-    public ResponseEntity<UserResponseDto> update(@PathVariable("id") Long id,
-                                                  @RequestBody UserSignupRequestDto dto) {
-        UserResponseDto updated = usersService.updateUser(id, dto);
-        if (updated == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        return ResponseEntity.ok(updated);
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponseDto> update(
+            @PathVariable Long id,
+            @Valid @RequestBody UserUpdateRequestDto dto) {
+
+        return ResponseEntity.ok(usersService.updateUser(id, dto));
     }
 
-    // delete
+    // delete user by id
     @DeleteMapping("/user/{id}")
-    public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         usersService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
 }
-
