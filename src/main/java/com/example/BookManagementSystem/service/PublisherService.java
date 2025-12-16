@@ -1,5 +1,6 @@
 package com.example.BookManagementSystem.service;
 
+import com.example.BookManagementSystem.dto.PublisherBooksDto;
 import com.example.BookManagementSystem.dto.PublisherCreateRequestDto;
 import com.example.BookManagementSystem.dto.PublisherResponseDto;
 import com.example.BookManagementSystem.dto.PublisherUpdateRequestDto;
@@ -89,5 +90,16 @@ public class PublisherService {
                 p.getPublisherId(),
                 p.getPublisherName()
         );
+    }
+
+    public List<PublisherBooksDto> getPublisherBooks(int id) {
+        Publisher publisher = publisherJpaRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Publisher not found"));
+        List<PublisherBooksDto> publisherBooksDtos=new ArrayList<>();
+        for(Book book:publisher.getBooks()){
+            publisherBooksDtos.add(new PublisherBooksDto(book.getId(),book.getName(),book.getImageUrl()));
+        }
+        return publisherBooksDtos;
+
     }
 }

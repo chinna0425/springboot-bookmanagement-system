@@ -22,7 +22,7 @@ public class BookCreateRequestDto {
     @NotNull(message = "Publisher id is required")
     @Positive(message = "Publisher id must be positive")
     private Integer publisherId;
-    @NotNull(message = "Publisher id is required")
+    @NotNull(message = "Author ids is required")
     private List<@Positive(message = "Author id must be positive") Integer> authorIds;
 }
 

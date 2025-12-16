@@ -28,6 +28,7 @@ public class Book {
 
     @ManyToOne
     @JoinColumn(name = "publisherid")
+    @JsonIgnoreProperties("books")
     private Publisher publisher;
 
     @ManyToMany

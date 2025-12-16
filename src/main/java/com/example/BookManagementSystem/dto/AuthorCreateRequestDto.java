@@ -15,8 +15,5 @@ public class AuthorCreateRequestDto {
 
     @NotBlank(message = "Author name is required") // ADDED
     private String authorName;
-
-
-    private List<@Positive(message = "Book id must be positive") Integer> bookIds;
 }
 

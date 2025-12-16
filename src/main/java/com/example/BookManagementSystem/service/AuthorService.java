@@ -1,8 +1,6 @@
 package com.example.BookManagementSystem.service;
 
-import com.example.BookManagementSystem.dto.AuthorCreateRequestDto;
-import com.example.BookManagementSystem.dto.AuthorResponseDto;
-import com.example.BookManagementSystem.dto.AuthorUpdateRequestDto;
+import com.example.BookManagementSystem.dto.*;
 import com.example.BookManagementSystem.exception.BadRequestException;
 import com.example.BookManagementSystem.exception.ResourceNotFoundException;
 import com.example.BookManagementSystem.model.Author;
@@ -47,17 +45,6 @@ public class AuthorService {
         author.setAuthorName(req.getAuthorName());
 
         Author saved = authorJpaRepository.save(author);
-
-        if (req.getBookIds() != null && !req.getBookIds().isEmpty()) {
-            List<Book> books = fetchBooksByIdsOrThrow(req.getBookIds());
-
-            for (Book b : books) {
-                b.getAuthorsList().add(saved); // bidirectional
-            }
-            bookJpaRepository.saveAll(books);
-            saved.setBooksList(books);
-        }
-
         return mapToDto(saved);
     }
 
@@ -106,10 +93,18 @@ public class AuthorService {
         authorJpaRepository.delete(author);
     }
 
-    public List<Book> getAuthorBooks(int authorId) {
+    public List<AuthorBooksDto> getAuthorBooks(int authorId) {
         Author author = authorJpaRepository.findById(authorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Author not found"));
-        return author.getBooksList();
+        return mapToBookDto(author.getBooksList());
+    }
+
+    private List<AuthorBooksDto> mapToBookDto(List<Book> booksList) {
+        List<AuthorBooksDto> authorBooksDtos=new ArrayList<>();
+        for(Book book:booksList){
+            authorBooksDtos.add(new AuthorBooksDto(book.getId(),book.getName(),book.getImageUrl()));
+        }
+        return authorBooksDtos;
     }
 
     // helper functions

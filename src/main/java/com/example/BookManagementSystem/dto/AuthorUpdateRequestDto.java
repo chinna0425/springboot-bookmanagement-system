@@ -12,6 +12,6 @@ public class AuthorUpdateRequestDto {
 
     private List<@Positive(message = "Book id must be positive") Integer> bookIds;
     public boolean isEmpty() {
-        return authorName == null && bookIds.isEmpty();
+        return authorName == null &&(bookIds ==null || bookIds.isEmpty());
     }
 }

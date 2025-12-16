@@ -1,8 +1,6 @@
 package com.example.BookManagementSystem.controller;
 
-import com.example.BookManagementSystem.dto.AuthorCreateRequestDto;
-import com.example.BookManagementSystem.dto.AuthorResponseDto;
-import com.example.BookManagementSystem.dto.AuthorUpdateRequestDto;
+import com.example.BookManagementSystem.dto.*;
 import com.example.BookManagementSystem.model.Book;
 import com.example.BookManagementSystem.service.AuthorService;
 import jakarta.validation.Valid;
@@ -28,14 +26,14 @@ public class AuthorController {
     }
 
     // Get By Id
-    @GetMapping("/authors/{id}")
+    @GetMapping("/author/{id}")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<AuthorResponseDto> getAuthorById(@PathVariable int id) {
         return ResponseEntity.ok(authorService.getAuthorById(id));
     }
 
     // add
-    @PostMapping("/authors")
+    @PostMapping("/addAuthor")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AuthorResponseDto> addAuthor(
             @Valid @RequestBody AuthorCreateRequestDto req) {
@@ -45,7 +43,7 @@ public class AuthorController {
     }
 
     // update
-    @PutMapping("/authors/{id}")
+    @PutMapping("/author/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AuthorResponseDto> updateAuthor(
             @PathVariable int id,
@@ -55,7 +53,7 @@ public class AuthorController {
     }
 
     // delete by Id
-    @DeleteMapping("/authors/{id}")
+    @DeleteMapping("/author/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteAuthor(@PathVariable int id) {
         authorService.deleteAuthor(id);
@@ -63,9 +61,9 @@ public class AuthorController {
     }
 
     // get author books by Id
-    @GetMapping("/authors/{id}/books")
+    @GetMapping("/author/{id}/books")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<List<Book>> getAuthorBooks(@PathVariable int id) {
+    public ResponseEntity<List<AuthorBooksDto>> getAuthorBooks(@PathVariable int id) {
         return ResponseEntity.ok(authorService.getAuthorBooks(id));
     }
 }

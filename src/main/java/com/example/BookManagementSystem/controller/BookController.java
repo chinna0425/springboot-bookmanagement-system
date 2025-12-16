@@ -32,7 +32,7 @@ public class BookController {
     }
 
     // add book
-    @PostMapping("/books")
+    @PostMapping("/addBook")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookResponseDto> addBook(
             @Valid @RequestBody BookCreateRequestDto req) {
@@ -42,7 +42,7 @@ public class BookController {
     }
 
     // update book by id
-    @PutMapping("/books/{id}")
+    @PutMapping("/book/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BookResponseDto> updateBook(
             @PathVariable int id,
@@ -52,7 +52,7 @@ public class BookController {
     }
 
     // delete book by id
-    @DeleteMapping("/books/{id}")
+    @DeleteMapping("/book/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteBook(@PathVariable int id) {
         bookService.deleteBook(id);
@@ -60,14 +60,14 @@ public class BookController {
     }
 
     // get publishers by book id
-    @GetMapping("/books/{id}/publisher")
+    @GetMapping("/book/{id}/publisher")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<PublisherResponseDto> getPublisher(@PathVariable int id) {
         return ResponseEntity.ok(bookService.getBookPublisher(id));
     }
 
     // get authors by book id
-    @GetMapping("/books/{id}/authors")
+    @GetMapping("/book/{id}/authors")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<List<AuthorResponseDto>> getAuthors(@PathVariable int id) {
         return ResponseEntity.ok(bookService.getBookAuthors(id));

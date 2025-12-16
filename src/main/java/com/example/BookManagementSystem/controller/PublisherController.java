@@ -1,8 +1,6 @@
 package com.example.BookManagementSystem.controller;
 
-import com.example.BookManagementSystem.dto.PublisherCreateRequestDto;
-import com.example.BookManagementSystem.dto.PublisherResponseDto;
-import com.example.BookManagementSystem.dto.PublisherUpdateRequestDto;
+import com.example.BookManagementSystem.dto.*;
 import com.example.BookManagementSystem.service.PublisherService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,14 +25,14 @@ public class PublisherController {
     }
 
     // get publisher by id
-    @GetMapping("/publishers/{id}")
+    @GetMapping("/publisher/{id}")
     @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<PublisherResponseDto> getPublisherById(@PathVariable int id) {
         return ResponseEntity.ok(publisherService.getPublisherById(id));
     }
 
     // add publisher
-    @PostMapping("/publishers")
+    @PostMapping("/addPublisher")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PublisherResponseDto> addPublisher(
             @Valid @RequestBody PublisherCreateRequestDto req) {
@@ -44,7 +42,7 @@ public class PublisherController {
     }
 
     // update publisher by id
-    @PutMapping("/publishers/{id}")
+    @PutMapping("/publisher/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PublisherResponseDto> updatePublisher(
             @PathVariable int id,
@@ -54,10 +52,15 @@ public class PublisherController {
     }
 
     // delete publisher by id
-    @DeleteMapping("/publishers/{id}")
+    @DeleteMapping("/publisher/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletePublisher(@PathVariable int id) {
         publisherService.deletePublisher(id);
         return ResponseEntity.noContent().build();
+    }
+    @GetMapping("/publisher/{id}/books")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<List<PublisherBooksDto>> getAuthors(@PathVariable int id) {
+        return ResponseEntity.ok(publisherService.getPublisherBooks(id));
     }
 }
