@@ -5,26 +5,22 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
 import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.Function;
 
 @Service
 public class JwtService {
 
-    // Not reading from application.properties — secret generated at startup
+    @Value("${jwt.secret}")
     private String secretKeyValue;
 
-    public JwtService() {
-        this.secretKeyValue = generateSecretKey();
-    }
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
 
     // ---------------- TOKEN GENERATION ----------------
 
@@ -39,14 +35,14 @@ public class JwtService {
                 .setClaims(claims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 30)) // 30 minutes
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration)) // 30 minutes
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     // ---------------- SECRET KEY GENERATION ----------------
 
-    public String generateSecretKey() {
+    /* public String generateSecretKey() {
         try {
             KeyGenerator keyGenerator = KeyGenerator.getInstance("HmacSHA256");
             SecretKey secretKey = keyGenerator.generateKey();
@@ -54,7 +50,7 @@ public class JwtService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Error during generating secret key", e);
         }
-    }
+    } */
 
     private Key getKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKeyValue);
